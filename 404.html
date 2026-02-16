@@ -1,1 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <base href="/Kosherstream.org/">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PRIMARY SEO TAGS -->
+    <title>KosherStream Ultra - The Ultimate Filtered Jewish Music Previewer</title>
+    <meta name="title" content="KosherStream Ultra - The Ultimate Filtered Jewish Music Previewer">
+    <meta name="description" content="Stream and preview Jewish music with advanced kosher filtering. Whitelist-based streaming, SoundCloud guard, and private library management for the kosher-conscious listener.">
+    <meta name="keywords" content="Jewish Music, Kosher Streaming, Jewish Songs, iTunes Previewer, Kosher SoundCloud, Jewish Radio, Filtered Music, Mordechai Shapiro, Avraham Fried, Jewish Arts">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="English">
+    <meta name="author" content="KosherStream Ultra">
 
+    <!-- OPEN GRAPH / FACEBOOK -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://kosherstream-ultra.app/">
+    <meta property="og:title" content="KosherStream Ultra - Filtered Jewish Music">
+    <meta property="og:description" content="The only music player with integrated whitelist/blacklist guard and iTunes preview functionality.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=1000&auto=format&fit=crop">
+
+    <!-- TWITTER -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="KosherStream Ultra">
+    <meta property="twitter:description" content="Advanced filtering for Jewish music previews.">
+
+    <!-- FAVICON -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+        
+        :root { 
+            --accent: #3b82f6; 
+            --accent-glow: rgba(59, 130, 246, 0.3); 
+            --app-scale: 1;
+        }
+        body { background-color: #000; color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; }
+        
+        #app-scaler {
+            transform: scale(var(--app-scale));
+            transform-origin: top left;
+            width: calc(100vw / var(--app-scale));
+            height: calc(100vh / var(--app-scale));
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            overflow: hidden;
+        }
+
+        .glass-panel { background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-sidebar { background: rgba(10, 10, 10, 0.95); border-right: 1px solid rgba(255, 255, 255, 0.08); }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+
+        .visualizer-bar { 
+            width: 4px; 
+            background: var(--accent); 
+            border-radius: 99px; 
+            transition: height 0.08s ease; 
+            min-height: 2px; 
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+        
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        input[type="range"] { accent-color: var(--accent); cursor: pointer; }
+        .theater-dim { opacity: 0.1; pointer-events: none; filter: grayscale(100%); transition: all 0.5s ease; }
+        .theater-btn-container { pointer-events: auto !important; opacity: 1 !important; filter: none !important; }
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak class="h-screen w-screen bg-black overflow-hidden relative">
+        
+        <!-- ONBOARDING MODAL -->
+        <div v-if="firstTimeSetup" class="fixed inset-0 z-[100] bg-black flex items-center justify-center p-6 text-center animate-fade-in">
+            <div class="max-w-4xl bg-neutral-900 p-12 rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-orange-500"></div>
+                <h1 class="text-5xl font-black mb-4 tracking-tighter text-white">WELCOME TO <span class="text-blue-500 italic">ULTRA</span></h1>
+                <p class="text-neutral-400 mb-10 text-lg">Choose your interface style.</p>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <button v-for="scale in scaleOptions" :key="scale.val" 
+                        @click="setAppScale(scale.val, true)" 
+                        class="p-5 border border-white/10 rounded-2xl hover:bg-blue-600 hover:border-blue-500 transition text-xs font-black bg-black/50 uppercase tracking-widest">
+                        {{ scale.name }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="app-scaler" :style="{ '--app-scale': appScale }">
+            
+            <!-- SIDEBAR -->
+            <aside :class="[
+    'fixed md:relative z-[70] md:z-30 h-full w-72 glass-sidebar flex flex-col transition-all duration-300',
+    showSettings ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+    theaterMode ? 'theater-dim' : ''
+]">
+    <button @click="showSettings = false" class="md:hidden absolute top-4 right-4 p-2 text-neutral-500">
+        <i data-lucide="x" class="w-6 h-6"></i>
+    </button>
+                <div class="p-8 flex flex-col gap-2">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/30">
+                            <i data-lucide="music" class="text-white w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-black text-2xl tracking-tighter leading-none text-white">KOSHER</h1>
+                            <span class="text-[10px] tracking-[0.4em] text-blue-500 font-bold block mt-1">ULTRA PLAYER</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 px-2 py-1 bg-white/5 rounded-lg border border-white/5 text-[9px] font-black uppercase tracking-widest text-neutral-500 text-center">
+                        iTunes Previewer
+                    </div>
+                </div>
+
+                <nav class="flex-1 px-4 space-y-2">
+                    <button @click="view = 'itunes'" :class="['w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-bold transition-all duration-200', view === 'itunes' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-neutral-400 hover:text-white hover:bg-white/5']">
+                        <i data-lucide="search" class="w-5 h-5"></i> iTunes Previewer
+                    </button>
+                    <button @click="view = 'soundcloud'" :class="['w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-bold transition-all duration-200', view === 'soundcloud' ? 'bg-orange-500 text-white shadow-lg shadow-orange-900/20' : 'text-neutral-400 hover:text-orange-400 hover:bg-white/5']">
+                        <i data-lucide="cloud" class="w-5 h-5"></i> SoundCloud Guard
+                    </button>
+                    <button @click="view = 'library'" :class="['w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-bold transition-all duration-200', view === 'library' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-white hover:bg-white/5']">
+                        <i data-lucide="library" class="w-5 h-5"></i> My Library
+                    </button>
+                    
+                    <div class="pt-8 pb-3 px-5 text-[10px] font-black text-neutral-600 uppercase tracking-widest">System Control</div>
+                    
+                    <button @click="openAdminGate" :class="['w-full flex items-center justify-between px-5 py-4 rounded-2xl text-sm font-bold transition-all duration-200', (view === 'admin' || showAdminGate) ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'text-neutral-400 hover:text-white hover:bg-white/5']">
+                        <div class="flex items-center gap-4"><i data-lucide="shield-alert" class="w-5 h-5"></i> Admin</div>
+                        <span v-if="reports.length > 0" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                    </button>
+                    <button @click="showSettings = true" class="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-sm font-bold text-neutral-400 hover:text-white hover:bg-white/5 transition-all">
+                        <i data-lucide="settings" class="w-5 h-5"></i> Settings
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- MAIN CONTENT -->
+            <main class="flex-1 flex flex-col relative bg-neutral-950">
+                <!-- HEADER -->
+                <header class="h-24 glass-panel flex items-center justify-between px-6 md:px-10 z-20 transition-all duration-500" :class="{'theater-dim': theaterMode}">
+    <button @click="showSettings = !showSettings" class="md:hidden p-3 hover:bg-white/10 rounded-xl bg-neutral-800/50 border border-white/5 mr-4">
+        <i data-lucide="menu" class="w-6 h-6"></i>
+    </button>
+                    <div class="flex items-center gap-6 flex-1">
+                        <div v-if="view === 'itunes' || view === 'library'" class="relative w-full max-w-2xl group flex items-center gap-4">
+                            <div class="relative flex-1">
+                                <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5 group-focus-within:text-blue-500 transition-colors"></i>
+                                <input v-model="searchQuery" @keyup.enter="performSearch" @focus="showRecent = true" type="text" placeholder="Search Jewish Music Database..." class="w-full bg-black/40 border border-white/10 rounded-full py-4 pl-14 pr-6 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none text-white transition-all shadow-inner">
+                            </div>
+                            
+                            <!-- LAYOUT SWITCHER -->
+                            <div class="flex bg-black/40 border border-white/10 p-1 rounded-full">
+                                <button @click="layoutType = 'grid'" :class="['p-2.5 rounded-full transition-all', layoutType === 'grid' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white']">
+                                    <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                                </button>
+                                <button @click="layoutType = 'list'" :class="['p-2.5 rounded-full transition-all', layoutType === 'list' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white']">
+                                    <i data-lucide="list" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+
+                            <!-- Recent Searches -->
+                            <div v-if="showRecent && settings.showRecentSearches && recentSearches.length > 0" class="absolute top-full left-0 w-full mt-2 bg-neutral-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                                <div class="flex items-center justify-between px-4 py-2 bg-black/20 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">
+                                    <span>Recent Searches</span>
+                                    <button @click="clearRecents" class="hover:text-red-400">Clear</button>
+                                </div>
+                                <div v-for="(term, i) in recentSearches" :key="i" @click="performSearch(term); showRecent = false" class="px-4 py-3 hover:bg-white/5 cursor-pointer text-sm text-neutral-300 flex items-center gap-3">
+                                    <i data-lucide="clock" class="w-3 h-3 text-neutral-600"></i> {{ term }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="view === 'soundcloud'" class="flex items-center gap-3 text-orange-500 bg-orange-500/10 px-4 py-2 rounded-full border border-orange-500/20">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i>
+                            <span class="font-black tracking-widest text-xs uppercase">{{ getFilterStatusText }}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-4 theater-btn-container">
+                        <div v-if="sleepTimer > 0" class="flex items-center gap-2 bg-blue-500/10 text-blue-400 px-4 py-2 rounded-full text-xs font-bold border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                            <i data-lucide="clock" class="w-3 h-3"></i> {{ formatTime(sleepTimer) }}
+                        </div>
+                        <button @click="toggleTheater" :class="['p-3 rounded-xl transition-all', theaterMode ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'text-neutral-500 hover:text-white hover:bg-white/10']" title="Toggle Theater Mode">
+                            <i :data-lucide="theaterMode ? 'monitor-off' : 'monitor'" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- SCROLLABLE CONTENT AREA -->
+                <div class="flex-1 overflow-y-auto custom-scrollbar p-10 relative" @click="showRecent = false">
+                    
+                    <!-- VIEW: iTUNES / LIBRARY -->
+                    <div v-if="view === 'itunes' || view === 'library'" class="animate-fade-in pb-32">
+                        <div v-if="view === 'library' && library.length === 0" class="flex flex-col items-center justify-center h-96 text-neutral-600">
+                            <i data-lucide="library" class="w-16 h-16 opacity-10 mb-6"></i>
+                            <p class="font-bold">Library Empty</p>
+                        </div>
+
+                        <!-- GRID VIEW -->
+                        <div v-else-if="layoutType === 'grid'" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+                            <div v-for="(song, idx) in displayedSongs" :key="song.trackId" 
+                                 @click="playItunesTrack(song, idx)"
+                                 class="group relative bg-neutral-900 p-5 rounded-[2rem] border border-white/5 hover:bg-neutral-800 transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-2xl">
+                                <div class="aspect-square rounded-3xl overflow-hidden mb-5 relative bg-black">
+                                    <img :src="song.artworkUrl100.replace('100x100', '600x600')" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center backdrop-blur-sm">
+                                        <div class="bg-white text-black w-12 h-12 flex items-center justify-center rounded-full shadow-xl">
+                                            <i :data-lucide="currentTrack?.trackId === song.trackId && isPlaying ? 'pause' : 'play'" class="w-5 h-5 fill-current ml-0.5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <h3 class="font-bold text-sm truncate text-white mb-1">{{ song.trackName }}</h3>
+                                <p class="text-xs text-neutral-500 truncate mb-4">{{ song.artistName }}</p>
+                                <div class="flex justify-between items-center border-t border-white/5 pt-4">
+                                    <button @click.stop="toggleLibrary(song)" :class="['p-1 rounded-full', isInLibrary(song) ? 'text-blue-500 bg-blue-500/10' : 'text-neutral-600 hover:text-white']">
+                                        <i :data-lucide="isInLibrary(song) ? 'check' : 'plus'" class="w-4 h-4"></i>
+                                    </button>
+                                    <button @click.stop="reportSong(song)" class="text-neutral-600 hover:text-red-500 p-1 rounded-full transition-colors"><i data-lucide="flag" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LIST VIEW (Line by Line) -->
+                        <div v-else class="space-y-2 max-w-6xl mx-auto">
+                            <div v-for="(song, idx) in displayedSongs" :key="song.trackId"
+                                 @click="playItunesTrack(song, idx)"
+                                 class="flex items-center gap-5 bg-neutral-900/40 p-3 rounded-2xl border border-white/5 hover:bg-white/5 cursor-pointer transition-all group">
+                                <img :src="song.artworkUrl100" class="w-12 h-12 rounded-xl">
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-bold text-sm truncate">{{ song.trackName }}</h4>
+                                    <p class="text-xs text-neutral-500 truncate">{{ song.artistName }}</p>
+                                </div>
+                                <div class="flex items-center gap-4 px-4">
+                                    <button @click.stop="toggleLibrary(song)" :class="['p-2 rounded-lg transition-colors', isInLibrary(song) ? 'text-blue-500' : 'text-neutral-600 hover:text-white']">
+                                        <i :data-lucide="isInLibrary(song) ? 'check' : 'plus'" class="w-4 h-4"></i>
+                                    </button>
+                                    <button @click.stop="reportSong(song)" class="text-neutral-600 hover:text-red-500 p-2"><i data-lucide="flag" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VIEW: SOUNDCLOUD GUARD -->
+                    <div v-if="view === 'soundcloud'" class="max-w-5xl mx-auto animate-fade-in space-y-8 mt-10 pb-40">
+                        <div class="bg-neutral-900/80 border border-white/10 p-2 rounded-[2rem] flex items-center gap-2 shadow-2xl backdrop-blur-xl">
+                            <div class="pl-6 pr-3 text-orange-500"><i data-lucide="cloud" class="w-6 h-6"></i></div>
+                            <input v-model="scInput" @keyup.enter="loadSoundCloud" type="text" placeholder="Paste SoundCloud Link or Artist Name..." class="flex-1 bg-transparent border-none text-white p-4 outline-none font-bold text-lg placeholder-neutral-600">
+                            <button @click="loadSoundCloud" class="bg-orange-600 hover:bg-orange-500 text-white px-8 py-4 rounded-[1.5rem] font-black transition shadow-lg flex items-center gap-3">
+                                <i data-lucide="play" class="w-5 h-5 fill-current"></i> CHECK & PLAY
+                            </button>
+                        </div>
+                        <div class="aspect-video bg-black rounded-[3rem] overflow-hidden relative ring-1 ring-white/10">
+                            <iframe v-if="scUrl" width="100%" height="100%" scrolling="no" frameborder="no" allow="autoplay" :src="'https://w.soundcloud.com/player/?url=' + encodeURIComponent(scUrl) + '&color=%23ff5500&auto_play=true&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false&visual=true'"></iframe>
+                            <div v-else class="absolute inset-0 flex flex-col items-center justify-center text-neutral-800">
+                                <i data-lucide="shield-check" class="w-32 h-32 mb-6 opacity-10"></i>
+                                <p class="font-black tracking-[0.5em] text-xs uppercase opacity-40">Safe Player Ready</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VIEW: ADMIN PANEL -->
+                    <div v-if="view === 'admin'" class="max-w-5xl mx-auto animate-fade-in pb-40">
+                        <div class="flex items-center justify-between mb-10 border-b border-white/10 pb-6">
+                            <div>
+                                <h2 class="text-4xl font-black mb-2">Command Center</h2>
+                                <p class="text-neutral-500">Manage filtering rules and user reports.</p>
+                            </div>
+                            <button @click="view = 'itunes'; adminAuthenticated = false" class="bg-red-500/10 text-red-500 px-6 py-3 rounded-xl text-xs font-black hover:bg-red-500 hover:text-white transition uppercase tracking-widest">Lock & Exit</button>
+                        </div>
+
+                        <!-- Main Controls (Restored Icons) -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+                            <div class="bg-neutral-900 p-6 rounded-3xl border border-white/10 flex flex-col justify-between h-44">
+                                <div class="flex justify-between items-start">
+                                    <div><h3 class="font-bold text-lg mb-1">Filter</h3><p class="text-xs text-neutral-500">Global filtering</p></div>
+                                    <i data-lucide="activity" class="text-blue-500 w-5 h-5"></i>
+                                </div>
+                            
+                                <button @click="toggleSetting('filterActive')" :class="['w-14 h-8 rounded-full relative transition-all', settings.filterActive ? 'bg-blue-600' : 'bg-neutral-700']">
+    <span :class="['absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform', settings.filterActive ? 'translate-x-6' : '']"></span>
+</button>
+                            </div>
+                            <div class="bg-neutral-900 p-6 rounded-3xl border border-white/10 flex flex-col justify-between h-44">
+                                <div class="flex justify-between items-start">
+                                    <div><h3 class="font-bold text-lg mb-1">Strict</h3><p class="text-xs text-neutral-500">Whitelist only</p></div>
+                                    <i data-lucide="shield-check" class="text-purple-500 w-5 h-5"></i>
+                                </div>
+                                <button @click="toggleSetting('strictMode')" :class="['w-14 h-8 rounded-full relative transition-all', settings.strictMode ? 'bg-purple-600' : 'bg-neutral-700']">
+                                    <span :class="['absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform', settings.strictMode ? 'translate-x-6' : '']"></span>
+                                </button>
+                            </div>
+                            <div class="bg-neutral-900 p-6 rounded-3xl border border-white/10 flex flex-col justify-between h-44">
+                                <div class="flex justify-between items-start">
+                                    <div><h3 class="font-bold text-lg mb-1">Links</h3><p class="text-xs text-neutral-500">Hide external</p></div>
+                                    <i data-lucide="unplug" class="text-orange-500 w-5 h-5"></i>
+                                </div>
+                                <button @click="toggleSetting('hideLinks')" :class="['w-14 h-8 rounded-full relative transition-all', settings.hideLinks ? 'bg-orange-600' : 'bg-neutral-700']">
+                                    <span :class="['absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform', settings.hideLinks ? 'translate-x-6' : '']"></span>
+                                </button>
+                            </div>
+                        
+                            <div class="bg-neutral-900 p-6 rounded-3xl border border-white/10 flex flex-col justify-between h-44">
+                                <div class="flex justify-between items-start">
+                                    <div><h3 class="font-bold text-lg mb-1 text-orange-500">Block SC</h3><p class="text-xs text-neutral-500">Kill SoundCloud Search</p></div>
+                                    <i data-lucide="cloud-off" class="text-orange-500 w-5 h-5"></i>
+                                </div>
+                            
+                                <button @click="toggleSetting('blockSoundcloud')" :class="['w-14 h-8 rounded-full relative transition-all', settings.blockSoundcloud ? 'bg-orange-600' : 'bg-neutral-700']">
+    <span :class="['absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform', settings.blockSoundcloud ? 'translate-x-6' : '']"></span>
+</button>
+                            </div>
+                            <div class="bg-neutral-900 p-6 rounded-3xl border border-white/10 flex flex-col justify-between h-44">
+                                <div class="flex justify-between items-start">
+                                    <div><h3 class="font-bold text-lg mb-1 text-blue-500">Block iTunes</h3><p class="text-xs text-neutral-500">Kill iTunes Search</p></div>
+                                    <i data-lucide="music-2" class="text-blue-500 w-5 h-5"></i>
+                                </div>
+                                <button @click="toggleSetting('blockItunes')" :class="['w-14 h-8 rounded-full relative transition-all', settings.blockItunes ? 'bg-blue-600' : 'bg-neutral-700']">
+                                    <span :class="['absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform', settings.blockItunes ? 'translate-x-6' : '']"></span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Management Tabs -->
+                        <div class="bg-neutral-900 rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl mb-10">
+                            <div class="flex border-b border-white/10 bg-black/20">
+                                <button @click="adminTab = 'white'" :class="['flex-1 py-5 font-bold text-xs uppercase tracking-widest', adminTab === 'white' ? 'bg-blue-600/10 text-blue-400 border-b-2 border-blue-500' : 'text-neutral-500']">Whitelist</button>
+                                <button @click="adminTab = 'black'" :class="['flex-1 py-5 font-bold text-xs uppercase tracking-widest', adminTab === 'black' ? 'bg-red-600/10 text-red-400 border-b-2 border-red-500' : 'text-neutral-500']">Blacklist</button>
+                                <button @click="adminTab = 'reports'" :class="['flex-1 py-5 font-bold text-xs uppercase tracking-widest relative', adminTab === 'reports' ? 'bg-orange-600/10 text-orange-400 border-b-2 border-orange-500' : 'text-neutral-500']">
+                                    Reports <span v-if="reports.length > 0" class="ml-2 w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse"></span>
+                                </button>
+                                <button @click="adminTab = 'security'" :class="['flex-1 py-5 font-bold text-xs uppercase tracking-widest', adminTab === 'security' ? 'bg-neutral-800 text-white border-b-2 border-white' : 'text-neutral-500']">Security</button>
+                            </div>
+
+                            <!-- List View -->
+                            <div v-if="adminTab === 'white' || adminTab === 'black'" class="p-8">
+                                <div class="flex gap-3 mb-6">
+                                    <input v-model="adminInput" @keyup.enter="addToList" type="text" placeholder="Add entry..." class="flex-1 bg-black border border-white/10 rounded-2xl px-6 py-4 text-sm outline-none">
+                                    <button @click="addToList" class="bg-white text-black px-8 rounded-2xl font-black"><i data-lucide="plus"></i></button>
+                                </div>
+                                <div class="mb-6 p-6 bg-black/30 rounded-3xl border border-white/5">
+                                    <div class="flex justify-between items-center cursor-pointer mb-2" @click="showImport = !showImport">
+                                        <span class="text-xs font-bold text-neutral-500 uppercase tracking-widest">Batch Import & Instructions</span>
+                                        <i :data-lucide="showImport ? 'chevron-up' : 'chevron-down'" class="w-4 h-4 text-neutral-500"></i>
+                                    </div>
+                                    <div v-if="showImport" class="mt-4 animate-fade-in">
+                                        <p class="text-[11px] text-neutral-400 mb-4 leading-relaxed bg-blue-500/5 p-4 rounded-xl border border-blue-500/10">
+                                            <strong>How to prepare:</strong> List names/keywords separated by a <strong>comma (,)</strong> or place each on a <strong>new line</strong>. <br>
+                                            <em>Example: Artist Name, Song Title, Keyword</em>
+                                        </p>
+                                        <textarea v-model="importText" placeholder="Paste your list here..." class="w-full bg-black border border-white/10 rounded-xl p-4 text-xs font-mono h-32 mb-4 focus:border-blue-500 outline-none custom-scrollbar"></textarea>
+                                        <button @click="performImport" class="w-full bg-blue-600 text-white py-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-500 transition">Process Import</button>
+                                    </div>
+                                </div>
+                                <div class="max-h-96 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-2 pr-4">
+                                    <div v-for="(item, i) in (adminTab === 'white' ? settings.whitelist : settings.blacklist)" :key="i" class="flex justify-between items-center bg-black/50 p-4 rounded-xl border border-white/5 group">
+                                        <span class="text-sm font-medium">{{ item }}</span>
+                                        <button @click="removeFromList(i)" class="text-neutral-600 hover:text-red-500 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Reports View (Block Song Option Added) -->
+                            <div v-if="adminTab === 'reports'" class="p-8">
+                                <div v-if="reports.length === 0" class="text-center py-20 text-neutral-600 italic">No reports found</div>
+                                <div v-else class="space-y-4">
+                                    <div v-for="(r, i) in reports" :key="i" class="bg-black p-5 rounded-3xl border border-white/10 flex items-center justify-between">
+                                        <div class="flex items-center gap-4">
+                                            <img :src="r.art" class="w-14 h-14 rounded-xl">
+                                            <div>
+                                                <h4 class="font-bold text-white text-sm">{{ r.track }}</h4>
+                                                <p class="text-xs text-blue-500">{{ r.artist }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button @click="resolveReport(i, 'block_song')" class="px-3 py-2 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black hover:bg-red-500 hover:text-white transition">BLOCK SONG</button>
+                                            <button @click="resolveReport(i, 'block_artist')" class="px-3 py-2 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black hover:bg-red-500 hover:text-white transition">BLOCK ARTIST</button>
+                                            <button @click="resolveReport(i, 'dismiss')" class="px-3 py-2 bg-neutral-800 text-neutral-400 rounded-lg text-[10px] font-black hover:bg-neutral-700 transition">DISMISS</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Security View -->
+                            <div v-if="adminTab === 'security'" class="p-10 text-center">
+                                <h3 class="font-bold text-xl mb-6">Security Settings</h3>
+                                <div class="max-w-xs mx-auto space-y-4">
+                                    <div class="text-left mb-4">
+                                        <label class="text-[10px] font-black uppercase text-neutral-500 tracking-widest ml-1">New Admin PIN</label>
+                                        <input v-model="newPinInput" type="password" placeholder="••••" class="w-full bg-black border border-white/10 rounded-2xl py-4 px-4 text-center text-xl outline-none focus:border-blue-500 mt-1">
+                                    </div>
+                                    <button @click="updatePin" class="w-full py-4 bg-white text-black font-black rounded-2xl hover:bg-neutral-200 transition">Update Security PIN</button>
+                                    <p v-if="pinSuccessMsg" class="text-green-500 text-xs font-bold">{{ pinSuccessMsg }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PLAYER FOOTER -->
+                <footer v-if="currentSource === 'itunes' && currentTrack" class="h-32 bg-black/95 border-t border-white/10 fixed bottom-0 w-full z-40 flex items-center justify-between px-8" :class="{'theater-dim': theaterMode}">
+                    <div class="flex items-center gap-5 w-1/4">
+                        <img :src="currentTrack.artworkUrl100" class="w-16 h-16 rounded-2xl border border-white/10 shadow-lg">
+                        <div class="min-w-0">
+                            <h4 class="font-bold text-sm truncate text-white">{{ currentTrack.trackName }}</h4>
+                            <p class="text-xs text-neutral-500 truncate">{{ currentTrack.artistName }}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col items-center flex-1 max-w-xl">
+                        <div v-if="visualizerEnabled && isPlaying" class="h-8 w-full flex items-end justify-center gap-1 mb-4">
+                            <div v-for="(h, i) in vizData" :key="i" class="visualizer-bar" :style="{ height: h + 'px' }"></div>
+                        </div>
+                        <div v-else class="h-8"></div>
+
+                        <div class="flex items-center gap-8 mb-3">
+                            <button @click="prevSong" class="text-neutral-500 hover:text-white transition p-2"><i data-lucide="skip-back" class="w-6 h-6 fill-current"></i></button>
+                            <button @click="togglePlay" class="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition">
+                                <i :data-lucide="isPlaying ? 'pause' : 'play'" class="w-5 h-5 fill-current ml-0.5"></i>
+                            </button>
+                            <button @click="nextSong" class="text-neutral-500 hover:text-white transition p-2"><i data-lucide="skip-forward" class="w-6 h-6 fill-current"></i></button>
+                        </div>
+                        <div class="w-full flex items-center gap-4 text-[10px] font-mono text-neutral-500 font-bold">
+                            <span>{{ formatDuration(currentTime) }}</span>
+                            <input type="range" min="0" :max="duration || 100" step="0.1" v-model="currentTime" @input="seek" class="flex-1 h-1.5 bg-neutral-800 rounded-full appearance-none">
+                            <span>{{ formatDuration(duration) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="w-1/4 flex justify-end gap-4 items-center">
+                         <i data-lucide="volume-2" class="w-5 h-5 text-neutral-500"></i>
+                         <input type="range" min="0" max="1" step="0.01" v-model="volume" class="w-28 h-1.5 bg-neutral-800 rounded-full appearance-none">
+                    </div>
+                </footer>
+            </main>
+
+            <!-- MODALS -->
+            <div v-if="showAdminGate" class="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
+                <div class="bg-neutral-900 border border-white/10 p-10 rounded-[2.5rem] w-full max-w-sm text-center shadow-2xl">
+                    <div class="w-16 h-16 bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-500"><i data-lucide="lock" class="w-8 h-8"></i></div>
+                    <h3 class="text-2xl font-black mb-6">Restricted Access</h3>
+                    <input type="password" v-model="pinInput" @keyup.enter="verifyPin" placeholder="••••" class="w-full bg-black border border-white/10 rounded-2xl py-4 text-center text-3xl tracking-[0.5em] mb-4 outline-none">
+                    <p class="text-red-500 text-xs font-bold mb-4">{{ pinError }}</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="showAdminGate = false; pinInput=''" class="py-4 rounded-xl bg-neutral-800 text-sm font-bold">Cancel</button>
+                        <button @click="verifyPin" class="py-4 rounded-xl bg-blue-600 text-sm font-bold shadow-lg">Unlock</button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="showSettings" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+                 <div class="bg-neutral-900 border border-white/10 p-10 rounded-[2.5rem] w-full max-w-lg shadow-2xl">
+                     <h3 class="text-3xl font-black mb-8">Settings</h3>
+                     <div class="space-y-6">
+                         <div class="p-6 bg-black rounded-3xl border border-white/5">
+                            <span class="text-xs font-bold text-neutral-500 uppercase tracking-widest block mb-4">Application Size</span>
+                            <div class="grid grid-cols-5 gap-2">
+                                <button v-for="scale in scaleOptions" :key="scale.val" @click="setAppScale(scale.val)" 
+                                    :class="['p-2 rounded-lg text-[9px] font-black border transition uppercase tracking-tighter', appScale === scale.val ? 'bg-blue-600 border-blue-500 text-white' : 'border-white/10 text-neutral-400 hover:bg-white/5']">
+                                    {{ scale.name }}
+                                </button>
+                            </div>
+                         </div>
+                         <div class="p-6 bg-black rounded-3xl border border-white/5 flex justify-between items-center">
+                             <span class="font-bold flex items-center gap-3"><i data-lucide="clock" class="w-5 h-5 text-blue-500"></i> Sleep Timer</span>
+                             <select v-model="sleepTimerInput" @change="setSleepTimer" class="bg-neutral-800 text-xs p-3 rounded-xl border-none outline-none font-bold">
+                                 <option :value="0">Off</option>
+                                 <option :value="15">15 Min</option>
+                                 <option :value="30">30 Min</option>
+                                 <option :value="60">1 Hour</option>
+                             </select>
+                         </div>
+                         <div class="p-6 bg-black rounded-3xl border border-white/5 flex justify-between items-center">
+                            <span class="font-bold flex items-center gap-3"><i data-lucide="waves" class="w-5 h-5 text-blue-500"></i> Audio Visualizer</span>
+                            <button @click="visualizerEnabled = !visualizerEnabled" :class="visualizerEnabled ? 'text-blue-500' : 'text-neutral-500'"><i :data-lucide="visualizerEnabled ? 'toggle-right' : 'toggle-left'" class="w-10 h-10"></i></button>
+                        </div>
+                        <div class="p-6 bg-black rounded-3xl border border-white/5 flex justify-between items-center">
+                            <span class="font-bold flex items-center gap-3"><i data-lucide="history" class="w-5 h-5 text-blue-500"></i> Recent Searches</span>
+                            <button @click="toggleSetting('showRecentSearches')" :class="settings.showRecentSearches ? 'text-blue-500' : 'text-neutral-500'"><i :data-lucide="settings.showRecentSearches ? 'toggle-right' : 'toggle-left'" class="w-10 h-10"></i></button>
+                        </div>
+                     </div>
+                     <button @click="showSettings = false" class="mt-10 w-full py-4 bg-white text-black font-black rounded-2xl shadow-xl">Done</button>
+                 </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { createApp, ref, computed, onMounted, watch } from "https://unpkg.com/vue@3/dist/vue.esm-browser.js";
+
+        const firebaseConfig = window.__firebase_config ? JSON.parse(window.__firebase_config) : null;
+        const app_id = typeof window.__app_id !== 'undefined' ? window.__app_id : 'kosherstream-ultra-v2';
+        
+        let db, auth;
+        if (firebaseConfig) {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+            } catch(e) { console.error("Firebase Initialization Failed", e); }
+        }
+
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        const DEFAULT_PIN_HASH = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
+
+        const SCALES = [
+            { name: 'Micro', val: 0.6 }, { name: 'Tiny', val: 0.7 }, { name: 'Small', val: 0.8 }, 
+            { name: 'Compact', val: 0.9 }, { name: 'Standard', val: 1.0 }, { name: 'Comfort', val: 1.1 }, 
+            { name: 'Large', val: 1.25 }, { name: 'Huge', val: 1.5 }, { name: 'Ultra', val: 1.75 }, { name: 'Max', val: 2.0 }
+        ];
+
+        createApp({
+            setup() {
+                const view = ref('itunes');
+                const layoutType = ref('grid');
+                const searchQuery = ref('');
+                const songs = ref([]);
+                const library = ref(JSON.parse(localStorage.getItem('ks_lib_v2') || '[]'));
+                const recentSearches = ref(JSON.parse(localStorage.getItem('ks_recents_v2') || '[]'));
+                const showRecent = ref(false);
+                const firstTimeSetup = ref(!localStorage.getItem('ks_setup_v2'));
+
+                const showAdminGate = ref(false);
+                const showSettings = ref(false);
+                const showImport = ref(false);
+                const importText = ref('');
+                const theaterMode = ref(false);
+                const visualizerEnabled = ref(true);
+                const appScale = ref(parseFloat(localStorage.getItem('ks_scale_v2') || 1));
+                const scaleOptions = SCALES;
+
+                const adminAuthenticated = ref(false);
+                const pinInput = ref('');
+                const newPinInput = ref('');
+                const pinError = ref('');
+                const pinSuccessMsg = ref('');
+                const adminTab = ref('white');
+                const adminInput = ref('');
+                
+                const audio = new Audio();
+                audio.crossOrigin = "anonymous"; 
+                const isPlaying = ref(false);
+                const currentTrack = ref(null);
+                const currentTrackIndex = ref(-1);
+                const duration = ref(0);
+                const currentTime = ref(0);
+                const volume = ref(0.8);
+                
+                let audioCtx, analyser, dataArray, source;
+                const vizData = ref(new Array(32).fill(2));
+
+                const currentSource = ref('itunes');
+                const scInput = ref('');
+                const scUrl = ref('');
+                const scError = ref('');
+
+                const settings = ref({
+                    filterActive: true,
+                    strictMode: true,
+                    blockSoundcloud: false,
+                    blockItunes: false,
+                    whitelist: ['Abie Rotenberg', 'Mordechai Shapiro', 'MBD', 'Mordechai Ben David', 'Mordechai Werdyger', 'Joey Newcomb', 'Ishay Ribo', 'Yishai Ribo', 'Shmuel', 'Shmuel Shapiro', 'Yitzchak Meir Helfgot', 'Yitzchok Meir Helfgot', 'Avraham Fried', 'Avremel', 'Yaakov Shwekey', 'Shwekey', 'Benny Friedman', 'Simcha Leiner', 'Lipa Schmeltzer', 'Lipa Shmeltzer', 'Shmueli Ungar', 'Beri Weber', 'Shmiel Ber Weber', 'Motty Steinmetz', 'Motti Steinmetz', 'Shulem Lemmer', 'Shulem', 'Yaakov Lemmer', 'Yanky Lemmer', 'Yoni Z', 'Yoni Zigelboum', '8th Day', 'Bentzi Marcus', 'Shmuel Marcus', 'Eli Marcus', 'Baruch Levine', 'Ari Goldwag', 'Uri Davidi', 'Shloime Gertner', 'Shlomo Gertner', 'Zusha', 'Shlomo Gaisin', 'Akiva', 'Akiva Turgeman', 'Hanan Ben Ari', 'Chanan Ben Ari', 'Yonatan Razel', 'Aaron Razel', 'Aharon Razel', 'Shuli Rand', 'Eitan Katz', 'Shlomo Katz', 'Yehuda Green', 'Levy Falkowitz', 'Yeedle', 'Yeedle Werdyger', 'Mendy Werdyger', 'Dedi Graucher', 'Dedi', 'Dudu Fisher', 'Shlomo Simcha', 'Shloime Dachs', 'Meilech Kohn', 'Nemouel', 'Nemouel Harroch', 'Eitan Freilich', 'Aryeh Kunstler', 'Pumpidisa', 'Moshe Storch', 'Yosef Karduner', 'The Portnoy Brothers', 'Udi Davidi', 'Moti Weiss', 'Motti Weiss', 'Natan Goshen', 'Nathan Goshen', 'Eviatar Banai', 'Benaia Barabi', 'Amir Dadon', 'Zanvil Weinberger', 'Netanel Israel', 'Avremi Roth', 'Yisrael Adler', 'Chaim Eliezer Hershtik', 'Ohad', 'Ohad Moskowitz', 'Itzik Dadya', 'Amram Adar', 'Yisroel Werdyger', 'Michoel Pruzansky', 'Pruz', 'Yisroel Amar', 'Dovid Gabay', 'Yosef Chaim Shwekey', 'Yitzchak Fuchs', 'Srully Williger', 'Michoel Schnitzler', 'Lulev', 'Shloime Taussig', 'Tzvi Silberstein', 'Bension Miller', 'Benzion Miller', 'Binyomin Miller', 'Yisroel Lamm', 'Sruly Green', 'Gershon Veroba', 'Piamenta', 'Yossi Piamenta', 'Avi Piamenta', 'Yisroel Juskowitz', 'Naftali Kempeh', 'Shmuel Braun', 'Tzvi Levin', 'Yair Levi', 'Yoni Genut', 'Yitzchak Meir', 'Yishai Lapidot', 'Kobi Brummer', 'Elad Shaer', 'Meydad Tasa', 'Yosef Chaim Shwekey', 'Zavdi', 'Aharit Hayamim', 'Shai Itzchak', 'Yackov Williger', 'Boruch Sholom', 'Boruch Sholom Blesofsky', 'Tali Yess', 'Moshe Yess', 'Shlock Rock', 'Lenny Solomon', 'Simcha Jacoby', 'Yisroel Laub', 'Dovid Haziza', 'Yakov Young', 'Yisroel Campbell', 'Meir Kay', 'Yoni Wineberg', 'Shmuli 2', 'Matt Dubb', 'DJ Farbreng', 'Sruly Meyer', 'Leibi Landesman', 'Shloime Zionce', 'London School of Jewish Song', 'Miami Boys Choir', 'MBC', 'Yerachmiel Begun', 'New York Boys Choir', 'NYBC', 'Yitzy Bald', 'Yeshiva Boys Choir', 'YBC', 'Eli Gerstner', 'Kinderlach', 'The Kinderlach', 'Thank You Hashem', 'TYH Nation', 'Yossi Green', 'Yonatan Shainfeld', 'Yonatan Sheinfeld', 'Pini Einhorn', 'Pini Einhorn', 'Dovi Meisels', 'Ahrele Samet', 'Velvel Feldman', 'Zusha', 'The Chevra', 'Tek-Noah', 'Menachem Klein', 'Mendy Wald', 'Yisroel Williger', 'Yosef Schick', 'Dovid Lowy', 'Shalsheles', 'Shalsheles Jr', 'Hamalachim', 'Tzamah', 'The Rabbis Sons', 'Dveikus', 'Journeys', 'Hameorerim', 'Ruach', 'Regesh', 'Shmuel Brazil', 'Yosef Moshe Kahane', 'Lchaim Tisch', 'Aish', 'The Shira Choir', 'Malchut Choir', 'Mezamrim Choir', 'Yedidim Choir', 'Zemiros Group', 'Lev Choir', 'Soulfarm', 'C Shira', 'Nigun Choir'], 
+                    blacklist: ['Nevaeh Black', 'P.O.V.', 'Yertay Zhartay', 'LUIGII', 'manwill', 'Dj X-Treme', 'ItzJordieee', 'We Got Your Back (Unofficial Seahawks Song)', 'Phoebe', 'Outlaws of Mercury', 'Danger to Society', 'At the Spot (Bodyslam Remix)', 'The Devil Is Dope', 'America', 'Insistir en la Llamada (feat. MBD)', 'Dont Call Me Phill', 'A Man That Need Quality', 'Bring That Ass Off the Wall', 'Prayer for My Moma', 'Billig Lykke', 'Chillin time', 'Stay Strong', 'Win Win Win (The Unofficial Seahawks Anthem)'],
+                    reports: [],
+                    hideLinks: false,
+                    showRecentSearches: true,
+                    adminPinHash: DEFAULT_PIN_HASH
+                });
+
+                const reports = computed(() => settings.value.reports || []);
+
+                const syncSettings = (user) => {
+                    if (!db || !user) return;
+                    const docRef = doc(db, 'artifacts', app_id, 'public', 'data', 'config');
+                    onSnapshot(docRef, (snap) => {
+                        if (snap.exists()) {
+                            settings.value = { ...settings.value, ...snap.data() };
+                            if(!settings.value.reports) settings.value.reports = [];
+                        } else {
+                            setDoc(docRef, settings.value); 
+                        }
+                    }, (err) => console.error(err));
+                };
+
+                const updateRemote = async () => {
+                    if (db && auth?.currentUser) {
+                        const docRef = doc(db, 'artifacts', app_id, 'public', 'data', 'config');
+                        await setDoc(docRef, settings.value, { merge: true });
+                    }
+                };
+
+                onMounted(async () => {
+                    lucide.createIcons();
+                    if (auth) {
+                        if (window.__initial_auth_token) await signInWithCustomToken(auth, window.__initial_auth_token);
+                        else await signInAnonymously(auth);
+                        onAuthStateChanged(auth, syncSettings);
+                    }
+                    audio.ontimeupdate = () => currentTime.value = audio.currentTime;
+                    audio.onloadedmetadata = () => duration.value = audio.duration;
+                    audio.onended = () => nextSong();
+                    performSearch('Jewish Music');
+                    startVisualizer();
+                });
+
+                watch([view, layoutType, currentTrack, settings, reports, showAdminGate, showSettings], () => { 
+                    setTimeout(() => lucide.createIcons(), 100); 
+                }, { deep: true });
+
+                watch(volume, (v) => audio.volume = v);
+                
+                const startVisualizer = () => {
+                    const loop = () => {
+                        if (visualizerEnabled.value && isPlaying.value && analyser) {
+                            analyser.getByteFrequencyData(dataArray);
+                            const temp = [];
+                            const step = Math.floor(dataArray.length / 32);
+                            for(let i=0; i<32; i++) {
+                                const val = dataArray[i*step];
+                                temp.push(Math.max(2, (val / 255) * 28));
+                            }
+                            vizData.value = temp;
+                        }
+                        requestAnimationFrame(loop);
+                    }
+                    loop();
+                };
+
+                const initAudioCtx = () => {
+                    if (!audioCtx) {
+                        try {
+                            const AudioContext = window.AudioContext || window.webkitAudioContext;
+                            audioCtx = new AudioContext();
+                            analyser = audioCtx.createAnalyser();
+                            analyser.fftSize = 64;
+                            source = audioCtx.createMediaElementSource(audio);
+                            source.connect(analyser);
+                            analyser.connect(audioCtx.destination);
+                            dataArray = new Uint8Array(analyser.frequencyBinCount);
+                        } catch(e) { console.warn(e); }
+                    }
+                    if(audioCtx?.state === 'suspended') audioCtx.resume();
+                };
+
+                const setAppScale = (s, closeSetup = false) => {
+                    appScale.value = s;
+                    localStorage.setItem('ks_scale_v2', s);
+                    if (closeSetup) {
+                        firstTimeSetup.value = false;
+                        localStorage.setItem('ks_setup_v2', 'true');
+                    }
+                };
+
+                const checkContent = (text) => {
+                    if (!settings.value.filterActive) return true;
+                    const t = text.toLowerCase();
+                    if (settings.value.blacklist.some(b => t.includes(b.toLowerCase()))) return false;
+                    if (settings.value.strictMode) return settings.value.whitelist.some(w => t.includes(w.toLowerCase()));
+                    return true; 
+                };
+
+                const displayedSongs = computed(() => {
+                    if (view.value === 'library') return library.value;
+                    return songs.value.filter(s => checkContent(s.artistName + ' ' + s.trackName));
+                });
+
+                const getFilterStatusText = computed(() => {
+                    if (!settings.value.filterActive) return "Filter Off";
+                    if (settings.value.strictMode) return "Strict Whitelist";
+                    return "Active Protection";
+                });
+
+                const performSearch = async (term) => {
+                    if (settings.value.blockItunes) {
+                        alert("iTunes Search is currently disabled by administrator.");
+                        return;
+                    }
+                    const q = typeof term === 'string' ? term : searchQuery.value;
+                    if (!q) return;
+                    if (settings.value.showRecentSearches && !recentSearches.value.includes(q)) {
+                        recentSearches.value.unshift(q);
+                        if(recentSearches.value.length > 10) recentSearches.value.pop();
+                        localStorage.setItem('ks_recents_v2', JSON.stringify(recentSearches.value));
+                    }
+                    try {
+                        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=100`);
+                        const data = await res.json();
+                        songs.value = data.results;
+                    } catch (e) { console.error(e); }
+                };
+
+                const playItunesTrack = (song, idx) => {
+                    initAudioCtx();
+                    currentSource.value = 'itunes';
+                    scUrl.value = ''; 
+                    currentTrack.value = song;
+                    currentTrackIndex.value = idx;
+                    audio.src = song.previewUrl;
+                    audio.play();
+                    isPlaying.value = true;
+                };
+
+                const nextSong = () => {
+                    const list = displayedSongs.value;
+                    if (currentTrackIndex.value < list.length - 1) playItunesTrack(list[currentTrackIndex.value + 1], currentTrackIndex.value + 1);
+                };
+
+                const prevSong = () => {
+                    if (currentTrackIndex.value > 0) playItunesTrack(displayedSongs.value[currentTrackIndex.value - 1], currentTrackIndex.value - 1);
+                    else audio.currentTime = 0;
+                };
+
+                const togglePlay = () => {
+                    initAudioCtx();
+                    if (audio.paused) { audio.play(); isPlaying.value = true; }
+                    else { audio.pause(); isPlaying.value = false; }
+                };
+
+                const seek = () => audio.currentTime = currentTime.value;
+                const clearRecents = () => { recentSearches.value = []; localStorage.setItem('ks_recents_v2', '[]'); };
+
+                const reportSong = (song) => {
+                    if (settings.value.reports.some(r => r.id === song.trackId)) return;
+                    settings.value.reports = [...(settings.value.reports || []), {
+                        id: song.trackId, track: song.trackName, artist: song.artistName, art: song.artworkUrl100, date: new Date().toISOString()
+                    }];
+                    updateRemote();
+                };
+
+                const resolveReport = (idx, action) => {
+                    const r = settings.value.reports[idx];
+                    settings.value.reports.splice(idx, 1);
+                    if (action === 'block_artist') settings.value.blacklist.push(r.artist);
+                    else if (action === 'block_song') settings.value.blacklist.push(r.track);
+                    updateRemote();
+                };
+
+                const performImport = () => {
+                    if (!importText.value.trim()) return;
+                    const items = importText.value.split(/\n|,/).map(s => s.trim()).filter(Boolean);
+                    if (adminTab.value === 'white') settings.value.whitelist = [...new Set([...settings.value.whitelist, ...items])];
+                    else settings.value.blacklist = [...new Set([...settings.value.blacklist, ...items])];
+                    updateRemote();
+                    importText.value = '';
+                    showImport.value = false;
+                };
+
+                const loadSoundCloud = () => {
+                    if (settings.value.blockSoundcloud) {
+                        scError.value = "SoundCloud is currently disabled by administrator.";
+                        return;
+                    }
+                    let url = scInput.value.trim();
+                    if (!url.includes('soundcloud.com')) url = `https://soundcloud.com/${url.toLowerCase().replace(/\s+/g, '-')}`;
+                    if (checkContent(scInput.value)) {
+                        audio.pause(); isPlaying.value = false;
+                        currentSource.value = 'soundcloud';
+                        scUrl.value = url; scError.value = '';
+                    } else {
+                        scError.value = "Content Filtered."; scUrl.value = '';
+                    }
+                };
+
+                const openExternalSC = () => { if(!settings.value.hideLinks) window.open('https://soundcloud.com/search?q=' + (scInput.value || 'Jewish Music'), '_blank'); };
+                const toggleLibrary = (song) => {
+                    const idx = library.value.findIndex(s => s.trackId === song.trackId);
+                    if (idx === -1) library.value.push(song); else library.value.splice(idx, 1);
+                    localStorage.setItem('ks_lib_v2', JSON.stringify(library.value));
+                };
+                const isInLibrary = (song) => library.value.some(s => s.trackId === song.trackId);
+
+                const openAdminGate = () => { if (adminAuthenticated.value) view.value = 'admin'; else showAdminGate.value = true; };
+                const verifyPin = async () => {
+                    const hash = await sha256(pinInput.value);
+                    if (hash === settings.value.adminPinHash) {
+                        adminAuthenticated.value = true; view.value = 'admin';
+                        showAdminGate.value = false; pinInput.value = ''; pinError.value = '';
+                    } else pinError.value = 'Invalid PIN';
+                };
+
+                const updatePin = async () => {
+                    if (newPinInput.value.length < 4) return;
+                    settings.value.adminPinHash = await sha256(newPinInput.value);
+                    await updateRemote();
+                    newPinInput.value = '';
+                    pinSuccessMsg.value = "Security Settings Updated!";
+                    setTimeout(() => pinSuccessMsg.value = '', 3000);
+                };
+
+                const toggleSetting = (key) => { settings.value[key] = !settings.value[key]; updateRemote(); };
+                const addToList = () => {
+                    if (!adminInput.value) return;
+                    const list = adminTab.value === 'white' ? settings.value.whitelist : settings.value.blacklist;
+                    list.push(adminInput.value);
+                    updateRemote(); adminInput.value = '';
+                };
+                const removeFromList = (idx) => {
+                    const list = adminTab.value === 'white' ? settings.value.whitelist : settings.value.blacklist;
+                    list.splice(idx, 1); updateRemote();
+                };
+
+                const sleepTimerInput = ref(0);
+                const sleepTimer = ref(0);
+                let timerInterval;
+                const setSleepTimer = () => {
+                    clearInterval(timerInterval);
+                    if (sleepTimerInput.value === 0) { sleepTimer.value = 0; return; }
+                    sleepTimer.value = sleepTimerInput.value * 60;
+                    timerInterval = setInterval(() => {
+                        sleepTimer.value--;
+                        if (sleepTimer.value <= 0) { clearInterval(timerInterval); audio.pause(); isPlaying.value = false; scUrl.value = ''; }
+                    }, 1000);
+                };
+
+                const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+                const formatDuration = (s) => s ? formatTime(Math.floor(s)) : "0:00";
+                const toggleTheater = () => theaterMode.value = !theaterMode.value;
+
+                return {
+                    view, layoutType, currentSource, searchQuery, displayedSongs, currentTrack, isPlaying, duration, currentTime, volume, library, recentSearches, showRecent,
+                    scInput, scUrl, scError, settings, reports, adminAuthenticated, showAdminGate, pinInput, newPinInput, pinError, pinSuccessMsg, adminTab, adminInput,
+                    showSettings, theaterMode, visualizerEnabled, vizData, sleepTimerInput, sleepTimer, appScale, scaleOptions, firstTimeSetup, showImport, importText,
+                    getFilterStatusText, performSearch, playItunesTrack, togglePlay, seek, nextSong, prevSong, loadSoundCloud, openExternalSC, clearRecents,
+                    toggleLibrary, isInLibrary, reportSong, resolveReport, performImport, openAdminGate, verifyPin, updatePin, toggleSetting, addToList, removeFromList,
+                    setSleepTimer, formatTime, formatDuration, setAppScale, toggleTheater
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
